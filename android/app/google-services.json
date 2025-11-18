@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "674027985114",
+    "project_id": "rainguard-app",
+    "storage_bucket": "rainguard-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:674027985114:android:2d562627f986caf7ce6de3",
+        "android_client_info": {
+          "package_name": "com.example.rainguard_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4o4_M-VZkPUOnCJfDDojwJ1AGQ57euVM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
