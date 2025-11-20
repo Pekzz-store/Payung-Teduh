@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'features/auth/auth_gate.dart'; // Pastikan import ini ada
+
+// --- PERBAIKAN IMPORT ---
+// Sesuai screenshot Anda, filenya ada di dalam folder "SplashScreen"
+import 'features/SplashScreen/splash_screen.dart';
 
 void main() async {
-  // 1. Wajib baris ini di paling atas
+  // Wajib ada untuk inisialisasi Firebase
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 2. Tunggu Firebase sampai siap
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+
+  // Inisialisasi Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(const MyApp());
 }
@@ -21,13 +22,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: false, // Hilangkan pita debug
       title: 'RainGuard',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const AuthGate(), // Pintu masuk via AuthGate
+      // Arahkan ke SplashScreen sebagai halaman pertama
+      home: const SplashScreen(),
     );
   }
 }

@@ -9,7 +9,7 @@ import 'package:geolocator/geolocator.dart'; // GPS
 import '../../models/station_model.dart';
 import '../../services/rental_service.dart';
 import 'widgets/active_rental_card.dart';
-import 'widgets/top_up_sheet.dart'; 
+import 'widgets/top_up_sheet.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,14 +22,14 @@ class _HomePageState extends State<HomePage> {
   // Controller untuk menggerakkan Peta
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
-  
+
   // Data Stasiun (Untuk Search)
   List<StationModel> _allStations = [];
   List<StationModel> _filteredStations = [];
   bool _isSearching = false;
 
   // Lokasi User (Default: Jakarta)
-  LatLng _myLocation = const LatLng(-6.194177, 106.822331); 
+  LatLng _myLocation = const LatLng(-6.194177, 106.822331);
 
   @override
   void initState() {
@@ -70,7 +70,10 @@ class _HomePageState extends State<HomePage> {
       results = _allStations;
     } else {
       results = _allStations
-          .where((station) => station.name.toLowerCase().contains(keyword.toLowerCase()))
+          .where(
+            (station) =>
+                station.name.toLowerCase().contains(keyword.toLowerCase()),
+          )
           .toList();
     }
     setState(() {
@@ -78,10 +81,23 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // --- FUNGSI BARU: ZOOM MAP ---
+  void _zoomIn() {
+    final currentZoom = _mapController.camera.zoom;
+    _mapController.move(_mapController.camera.center, currentZoom + 1);
+  }
+
+  void _zoomOut() {
+    final currentZoom = _mapController.camera.zoom;
+    _mapController.move(_mapController.camera.center, currentZoom - 1);
+  }
+  // -----------------------------
+
   @override
   Widget build(BuildContext context) {
     final User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (user == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final String currentUserId = user.uid;
 
     return Scaffold(
@@ -107,7 +123,7 @@ class _HomePageState extends State<HomePage> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.rainguard.app',
               ),
-              
+
               // Marker Lokasi Saya (Titik Biru Berdenyut)
               MarkerLayer(
                 markers: [
@@ -120,7 +136,12 @@ class _HomePageState extends State<HomePage> {
                         color: Colors.blueAccent,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.5), blurRadius: 10)]
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.5),
+                            blurRadius: 10,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -129,7 +150,9 @@ class _HomePageState extends State<HomePage> {
 
               // Marker Stasiun dari Firebase
               StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('stations').snapshots(),
+                stream: FirebaseFirestore.instance
+                    .collection('stations')
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const SizedBox();
 
@@ -138,9 +161,11 @@ class _HomePageState extends State<HomePage> {
                   // Kita update list stasiun lokal jika data baru masuk dan user TIDAK sedang mengetik
                   if (!_isSearching && _searchController.text.isEmpty) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                       if (mounted) {
-                         _allStations = docs.map((d) => StationModel.fromFirestore(d)).toList();
-                       }
+                      if (mounted) {
+                        _allStations = docs
+                            .map((d) => StationModel.fromFirestore(d))
+                            .toList();
+                      }
                     });
                   }
 
@@ -151,7 +176,8 @@ class _HomePageState extends State<HomePage> {
                       width: 80,
                       height: 80,
                       child: GestureDetector(
-                        onTap: () => _showStationDetail(context, station, currentUserId),
+                        onTap: () =>
+                            _showStationDetail(context, station, currentUserId),
                         child: _buildCustomMarker(station),
                       ),
                     );
@@ -175,29 +201,31 @@ class _HomePageState extends State<HomePage> {
                 // KOTAK PENCARIAN
                 Card(
                   elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
                   child: TextField(
                     controller: _searchController,
                     onTap: () => setState(() => _isSearching = true),
                     onChanged: (value) {
-                       setState(() => _isSearching = true);
-                       _runFilter(value);
+                      setState(() => _isSearching = true);
+                      _runFilter(value);
                     },
                     decoration: InputDecoration(
                       hintText: "Cari lokasi payung...",
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 15),
-                      suffixIcon: _isSearching 
-                        ? IconButton(
-                            icon: const Icon(Icons.close), 
-                            onPressed: () {
-                              _searchController.clear();
-                              FocusScope.of(context).unfocus();
-                              setState(() => _isSearching = false);
-                            }
-                          ) 
-                        : null,
+                      suffixIcon: _isSearching
+                          ? IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                _searchController.clear();
+                                FocusScope.of(context).unfocus();
+                                setState(() => _isSearching = false);
+                              },
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -210,21 +238,38 @@ class _HomePageState extends State<HomePage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(15),
-                      boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]
+                      boxShadow: [
+                        BoxShadow(color: Colors.black12, blurRadius: 10),
+                      ],
                     ),
-                    constraints: const BoxConstraints(maxHeight: 200), // Batas tinggi list
+                    constraints: const BoxConstraints(
+                      maxHeight: 200,
+                    ), // Batas tinggi list
                     child: ListView.builder(
                       shrinkWrap: true,
                       itemCount: _filteredStations.length,
                       itemBuilder: (context, index) {
                         final station = _filteredStations[index];
                         return ListTile(
-                          leading: const Icon(Icons.location_on, color: Colors.blue),
-                          title: Text(station.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(station.address, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          leading: const Icon(
+                            Icons.location_on,
+                            color: Colors.blue,
+                          ),
+                          title: Text(
+                            station.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            station.address,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           onTap: () {
                             // 1. Pindahkan Peta ke lokasi stasiun
-                            _mapController.move(LatLng(station.latitude, station.longitude), 18);
+                            _mapController.move(
+                              LatLng(station.latitude, station.longitude),
+                              18,
+                            );
                             // 2. Tutup Search
                             setState(() => _isSearching = false);
                             FocusScope.of(context).unfocus();
@@ -242,9 +287,8 @@ class _HomePageState extends State<HomePage> {
           // ==============================================================
           // LAYER 3: UI STATUS AKTIF SEWA (Jika ada)
           // ==============================================================
-          // Kita taruh di bawah agar tidak tertutup search list
-           Positioned(
-            top: 120, // Geser ke bawah sedikit
+          Positioned(
+            top: 120,
             left: 0,
             right: 0,
             child: StreamBuilder<QuerySnapshot>(
@@ -261,9 +305,38 @@ class _HomePageState extends State<HomePage> {
                     rentalData: rentalDoc.data() as Map<String, dynamic>,
                     rentalId: rentalDoc.id,
                   );
-                } 
+                }
                 return const SizedBox();
               },
+            ),
+          ),
+
+          // ==============================================================
+          // FITUR BARU: TOMBOL ZOOM (+ dan -)
+          // ==============================================================
+          Positioned(
+            bottom: 170, // Posisi di atas tombol GPS
+            right: 20,
+            child: Column(
+              children: [
+                // Tombol Zoom In (+)
+                FloatingActionButton.small(
+                  heroTag: "zoom_in", // Wajib beda tag agar tidak error
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  onPressed: _zoomIn,
+                  child: const Icon(Icons.add),
+                ),
+                const SizedBox(height: 10),
+                // Tombol Zoom Out (-)
+                FloatingActionButton.small(
+                  heroTag: "zoom_out", // Wajib beda tag
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  onPressed: _zoomOut,
+                  child: const Icon(Icons.remove),
+                ),
+              ],
             ),
           ),
 
@@ -288,46 +361,80 @@ class _HomePageState extends State<HomePage> {
             bottom: 30,
             left: 20,
             child: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(currentUserId).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUserId)
+                  .snapshots(),
               builder: (context, snapshot) {
                 int balance = 0;
                 if (snapshot.hasData && snapshot.data!.exists) {
-                   var data = snapshot.data!.data() as Map<String, dynamic>?;
-                   balance = data?['balance'] ?? 0;
+                  var data = snapshot.data!.data() as Map<String, dynamic>?;
+                  balance = data?['balance'] ?? 0;
                 }
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 5))],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.account_balance_wallet, color: Colors.blueAccent),
+                      const Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.blueAccent,
+                      ),
                       const SizedBox(width: 10),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Saldo Anda", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                          Text("Rp $balance", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                          const Text(
+                            "Saldo Anda",
+                            style: TextStyle(fontSize: 10, color: Colors.grey),
+                          ),
+                          Text(
+                            "Rp $balance",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(width: 10),
                       InkWell(
                         onTap: () => showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => TopUpSheet(userId: currentUserId),
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) =>
+                              TopUpSheet(userId: currentUserId),
                         ),
                         child: Container(
-                          width: 30, height: 30,
-                          decoration: BoxDecoration(color: Colors.blue[50], shape: BoxShape.circle),
-                          child: const Icon(Icons.add, size: 18, color: Colors.blue),
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            size: 18,
+                            color: Colors.blue,
+                          ),
                         ),
-                      )
+                      ),
                     ],
                   ),
                 );
@@ -339,7 +446,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- HELPER (Sama seperti sebelumnya) ---
+  // --- HELPER ---
   Widget _buildCustomMarker(StationModel station) {
     bool isAvailable = station.availableUmbrellas > 0;
     return Column(
@@ -359,19 +466,28 @@ class _HomePageState extends State<HomePage> {
           margin: const EdgeInsets.only(top: 4),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: Colors.white, borderRadius: BorderRadius.circular(8),
-            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)]
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
           ),
           child: Text(
             "${station.availableUmbrellas} unit",
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isAvailable ? Colors.black : Colors.red),
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: isAvailable ? Colors.black : Colors.red,
+            ),
           ),
-        )
+        ),
       ],
     );
   }
 
-  void _showStationDetail(BuildContext context, StationModel station, String userId) {
+  void _showStationDetail(
+    BuildContext context,
+    StationModel station,
+    String userId,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -387,15 +503,29 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 5, color: Colors.grey[300])),
+              Center(
+                child: Container(width: 40, height: 5, color: Colors.grey[300]),
+              ),
               const SizedBox(height: 24),
-              Text(station.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(
+                station.name,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 5),
               Row(
                 children: [
                   const Icon(Icons.location_on, size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
-                  Expanded(child: Text(station.address, style: TextStyle(color: Colors.grey[600]), overflow: TextOverflow.ellipsis)),
+                  Expanded(
+                    child: Text(
+                      station.address,
+                      style: TextStyle(color: Colors.grey[600]),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
               const Divider(height: 40),
@@ -405,17 +535,33 @@ class _HomePageState extends State<HomePage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Stok Payung", style: TextStyle(color: Colors.grey)),
-                      Text("${station.availableUmbrellas} Unit", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+                      const Text(
+                        "Stok Payung",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      Text(
+                        "${station.availableUmbrellas} Unit",
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
                     ],
                   ),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text("Tarif", style: TextStyle(color: Colors.grey)),
-                      Text("Rp 5.000/jam", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(
+                        "Rp 5.000/jam",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
               const Spacer(),
@@ -423,18 +569,24 @@ class _HomePageState extends State<HomePage> {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: station.availableUmbrellas > 0 
-                    ? () {
-                        Navigator.pop(context);
-                        _showRentalConfirmation(context, station, userId); 
-                      }
-                    : null,
+                  onPressed: station.availableUmbrellas > 0
+                      ? () {
+                          Navigator.pop(context);
+                          _showRentalConfirmation(context, station, userId);
+                        }
+                      : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent, 
+                    backgroundColor: Colors.blueAccent,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  child: Text(station.availableUmbrellas > 0 ? "SEWA SEKARANG" : "STOK HABIS"),
+                  child: Text(
+                    station.availableUmbrellas > 0
+                        ? "SEWA SEKARANG"
+                        : "STOK HABIS",
+                  ),
                 ),
               ),
             ],
@@ -444,28 +596,56 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showRentalConfirmation(BuildContext context, StationModel station, String userId) {
+  void _showRentalConfirmation(
+    BuildContext context,
+    StationModel station,
+    String userId,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Konfirmasi Sewa"),
-        content: Text("Sewa payung di ${station.name}?\n(Minimal saldo Rp 5.000)"),
+        content: Text(
+          "Sewa payung di ${station.name}?\n(Minimal saldo Rp 5.000)",
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal"),
+          ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🔄 Memproses..."), duration: Duration(seconds: 1)));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("🔄 Memproses..."),
+                  duration: Duration(seconds: 1),
+                ),
+              );
               try {
-                await RentalService().startRental(stationId: station.id, stationName: station.name, userId: userId);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Sewa Berhasil!"), backgroundColor: Colors.green));
+                await RentalService().startRental(
+                  stationId: station.id,
+                  stationName: station.name,
+                  userId: userId,
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("✅ Sewa Berhasil!"),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               } catch (e) {
                 String msg = e.toString().replaceAll("Exception: ", "");
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal: $msg"), backgroundColor: Colors.red));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Gagal: $msg"),
+                    backgroundColor: Colors.red,
+                  ),
+                );
               }
             },
             child: const Text("KONFIRMASI"),
-          )
+          ),
         ],
       ),
     );
