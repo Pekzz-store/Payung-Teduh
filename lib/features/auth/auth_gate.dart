@@ -6,7 +6,10 @@ import 'login_page.dart';
 import 'register_page.dart';
 
 // Import Halaman Utama (Yang punya Bottom Navigation Bar)
-import '../main_page.dart'; 
+import '../main_page.dart';
+// Import Admin Dashboard
+import '../admin/admin_dashboard.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -17,13 +20,31 @@ class AuthGate extends StatelessWidget {
       // Memantau status login secara real-time
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // 1. Jika User Sudah Login -> Masuk ke MainPage (Menu Bawah)
+        // 1. Jika User Sudah Login -> Periksa role di Firestore
         if (snapshot.hasData) {
-          return const MainPage();
+          final user = snapshot.data!;
+          // Stream ke dokumen user untuk membaca field 'role'
+          return StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .snapshots(),
+            builder: (context, userSnapshot) {
+              if (!userSnapshot.hasData)
+                return const Center(child: CircularProgressIndicator());
+              final doc = userSnapshot.data!;
+              final data = doc.data() as Map<String, dynamic>?;
+              final role = data?['role'] as String? ?? 'user';
+              if (role == 'admin') {
+                return const AdminDashboard();
+              }
+              return const MainPage();
+            },
+          );
         }
 
         // 2. Jika Belum Login -> Tampilkan Toggle Login/Register
-        return const AuthToggle(); 
+        return const AuthToggle();
       },
     );
   }
