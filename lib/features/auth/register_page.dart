@@ -33,7 +33,18 @@ class _RegisterPageState extends State<RegisterPage>
         password: _passController.text.trim(),
         username: _nameController.text.trim(),
       );
-      // Jika sukses, AuthGate akan otomatis mengarahkan ke Home
+      // Sign out setelah registrasi sukses agar tidak langsung ke home
+      await AuthService().logout();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registrasi berhasil! Silakan login."),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Switch ke login page
+        widget.onSwitchToLogin();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

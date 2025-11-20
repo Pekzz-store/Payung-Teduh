@@ -1,0 +1,4 @@
+- [x] Modify _handleRegister in RegisterPage to sign out after successful registration
+- [x] Show success message after registration
+- [x] Switch to login page after registration
+- [x] Test the registration flow

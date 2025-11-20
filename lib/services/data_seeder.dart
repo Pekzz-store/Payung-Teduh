@@ -15,39 +15,39 @@ class DataSeeder {
 
     print("🚀 Mulai mengirim data...");
 
-    // --- DATA DUMMY 1: Stasiun MRT ---
+    // --- DATA DUMMY 1: Matahari ---
     String id1 = stationsRef.doc().id; // Bikin ID unik otomatis
     batch.set(stationsRef.doc(id1), {
-      'name': 'Stasiun MRT Bundaran HI',
-      'address': 'Jl. M.H. Thamrin No.1',
+      'name': 'Matahari Madiun',
+      'address': 'Matahari Departemen Store',
       // GeoPoint(Latitude, Longitude) -> Koordinat Jakarta
-      'geo_point': const GeoPoint(-6.193046, 106.822331), 
+      'geo_point': const GeoPoint(-7.625600, 111.519953),
       'total_umbrellas': 10,
       'available_umbrellas': 8,
       'price_per_hour': 5000,
       'is_active': true,
     });
 
-    // --- DATA DUMMY 2: Grand Indonesia ---
+    // --- DATA DUMMY 2: Sun City ---
     String id2 = stationsRef.doc().id;
     batch.set(stationsRef.doc(id2), {
-      'name': 'Grand Indonesia - West Mall',
-      'address': 'Lobby Arjuna',
-      'geo_point': const GeoPoint(-6.194177, 106.819737),
+      'name': 'Sun City Madiun',
+      'address': 'Sun City Department Store',
+      'geo_point': const GeoPoint(-7.622488, 111.536352),
       'total_umbrellas': 15,
-      'available_umbrellas': 2, 
+      'available_umbrellas': 2,
       'price_per_hour': 5000,
       'is_active': true,
     });
 
-    // --- DATA DUMMY 3: Halte Tosari ---
+    // --- DATA DUMMY 3: Alun-Alun ---
     String id3 = stationsRef.doc().id;
     batch.set(stationsRef.doc(id3), {
-      'name': 'Halte Transjakarta Tosari',
-      'address': 'Jl. Jend. Sudirman',
-      'geo_point': const GeoPoint(-6.199323, 106.823774),
+      'name': 'Alun-Alun Madiun',
+      'address': 'Alun-Alun Kota Madiun',
+      'geo_point': const GeoPoint(-7.629182, 111.516879),
       'total_umbrellas': 5,
-      'available_umbrellas': 5, 
+      'available_umbrellas': 5,
       'price_per_hour': 5000,
       'is_active': true,
     });

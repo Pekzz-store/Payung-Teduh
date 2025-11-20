@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage> {
   bool _isSearching = false;
 
   // Lokasi User (Default: Jakarta)
-  LatLng _myLocation = const LatLng(-6.194177, 106.822331);
+  LatLng _myLocation = const LatLng(-7.625600, 111.519953);
 
   @override
   void initState() {
