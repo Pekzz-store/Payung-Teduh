@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math'; // Untuk simulasi data cuaca acak
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart'; // Peta
 import 'package:latlong2/latlong.dart'; // Koordinat
@@ -19,69 +21,94 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Controller untuk menggerakkan Peta
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
 
-  // Data Stasiun (Untuk Search)
   List<StationModel> _allStations = [];
   List<StationModel> _filteredStations = [];
   bool _isSearching = false;
-
-  // Lokasi User (Default: Jakarta)
   LatLng _myLocation = const LatLng(-7.625600, 111.519953);
+
+  // --- VARIABEL CUACA ---
+  String _weatherCondition = "Memuat..."; // Cerah, Hujan, Berawan
+  String _temperature = "--";
+  bool _isWeatherLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _determinePosition(); // Cek GPS saat aplikasi dibuka
+    _determinePosition();
+    _fetchWeatherSimulated(); // Panggil simulasi cuaca
   }
 
-  // Fungsi Cek GPS
+  // --- SIMULASI DATA CUACA (MOCK) ---
+  // Nanti bisa diganti dengan HTTP Request ke OpenWeatherMap
+  Future<void> _fetchWeatherSimulated() async {
+    setState(() => _isWeatherLoading = true);
+    
+    // Simulasi delay jaringan 1.5 detik
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    if (!mounted) return;
+
+    // Random kondisi untuk demo
+    final random = Random();
+    int conditionId = random.nextInt(3); // 0: Hujan, 1: Berawan, 2: Cerah
+    int temp = 24 + random.nextInt(10); // Suhu antara 24-33
+
+    setState(() {
+      _temperature = "$temp°C";
+      if (conditionId == 0) {
+        _weatherCondition = "Hujan Deras";
+      } else if (conditionId == 1) {
+        _weatherCondition = "Berawan";
+      } else {
+        _weatherCondition = "Cerah";
+      }
+      _isWeatherLoading = false;
+    });
+  }
+
   Future<void> _determinePosition() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // 1. Cek apakah GPS nyala?
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
 
-    // 2. Cek Izin Aplikasi
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) return;
     }
 
-    // 3. Ambil Lokasi
-    Position position = await Geolocator.getCurrentPosition();
-    setState(() {
-      _myLocation = LatLng(position.latitude, position.longitude);
-    });
-
-    // 4. Pindahkan kamera peta ke lokasi user
-    _mapController.move(_myLocation, 15);
+    try {
+      Position position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _myLocation = LatLng(position.latitude, position.longitude);
+        });
+        _mapController.move(_myLocation, 15);
+        _fetchWeatherSimulated(); // Update cuaca saat lokasi berubah
+      }
+    } catch (e) {
+      debugPrint("Error Lokasi: $e");
+    }
   }
 
-  // Fungsi Search
   void _runFilter(String keyword) {
     List<StationModel> results = [];
     if (keyword.isEmpty) {
       results = _allStations;
     } else {
       results = _allStations
-          .where(
-            (station) =>
-                station.name.toLowerCase().contains(keyword.toLowerCase()),
-          )
+          .where((station) =>
+              station.name.toLowerCase().contains(keyword.toLowerCase()))
           .toList();
     }
-    setState(() {
-      _filteredStations = results;
-    });
+    setState(() => _filteredStations = results);
   }
 
-  // --- FUNGSI BARU: ZOOM MAP ---
   void _zoomIn() {
     final currentZoom = _mapController.camera.zoom;
     _mapController.move(_mapController.camera.center, currentZoom + 1);
@@ -91,7 +118,6 @@ class _HomePageState extends State<HomePage> {
     final currentZoom = _mapController.camera.zoom;
     _mapController.move(_mapController.camera.center, currentZoom - 1);
   }
-  // -----------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -104,16 +130,13 @@ class _HomePageState extends State<HomePage> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // ==============================================================
           // LAYER 1: PETA
-          // ==============================================================
           FlutterMap(
-            mapController: _mapController, // Pasang Controller
+            mapController: _mapController,
             options: MapOptions(
               initialCenter: _myLocation,
               initialZoom: 15.0,
               onTap: (_, __) {
-                // Tutup keyboard/search jika klik peta
                 FocusScope.of(context).unfocus();
                 setState(() => _isSearching = false);
               },
@@ -123,8 +146,6 @@ class _HomePageState extends State<HomePage> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.rainguard.app',
               ),
-
-              // Marker Lokasi Saya (Titik Biru Berdenyut)
               MarkerLayer(
                 markers: [
                   Marker(
@@ -138,27 +159,21 @@ class _HomePageState extends State<HomePage> {
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.5),
-                            blurRadius: 10,
-                          ),
+                              color: Colors.blue.withOpacity(0.5),
+                              blurRadius: 10),
                         ],
                       ),
                     ),
                   ),
                 ],
               ),
-
-              // Marker Stasiun dari Firebase
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('stations')
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const SizedBox();
-
-                  // Simpan data untuk fitur search
                   var docs = snapshot.data!.docs;
-                  // Kita update list stasiun lokal jika data baru masuk dan user TIDAK sedang mengetik
                   if (!_isSearching && _searchController.text.isEmpty) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted) {
@@ -168,42 +183,177 @@ class _HomePageState extends State<HomePage> {
                       }
                     });
                   }
-
-                  List<Marker> markers = docs.map((doc) {
-                    StationModel station = StationModel.fromFirestore(doc);
-                    return Marker(
-                      point: LatLng(station.latitude, station.longitude),
-                      width: 80,
-                      height: 80,
-                      child: GestureDetector(
-                        onTap: () =>
-                            _showStationDetail(context, station, currentUserId),
-                        child: _buildCustomMarker(station),
-                      ),
-                    );
-                  }).toList();
-
-                  return MarkerLayer(markers: markers);
+                  return MarkerLayer(
+                    markers: docs.map((doc) {
+                      StationModel station = StationModel.fromFirestore(doc);
+                      return Marker(
+                        point: LatLng(station.latitude, station.longitude),
+                        width: 80,
+                        height: 80,
+                        child: GestureDetector(
+                          onTap: () => _showStationDetail(
+                              context, station, currentUserId),
+                          child: _buildCustomMarker(station),
+                        ),
+                      );
+                    }).toList(),
+                  );
                 },
               ),
             ],
           ),
 
-          // ==============================================================
-          // LAYER 2: SEARCH BAR CANGGIH
-          // ==============================================================
+          // LAYER 2: STATUS SEWA (Active Rental)
+          Positioned(
+            top: 180, // Turunkan sedikit agar tidak menutupi widget cuaca
+            left: 0,
+            right: 0,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('rentals')
+                  .where('userId', isEqualTo: currentUserId)
+                  .where('status', isEqualTo: 'active')
+                  .limit(1)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                  var rentalDoc = snapshot.data!.docs.first;
+                  return ActiveRentalCard(
+                    rentalData: rentalDoc.data() as Map<String, dynamic>,
+                    rentalId: rentalDoc.id,
+                  );
+                }
+                return const SizedBox();
+              },
+            ),
+          ),
+
+          // LAYER 3: TOMBOL ZOOM & GPS
+          Positioned(
+            bottom: 170,
+            right: 20,
+            child: Column(
+              children: [
+                FloatingActionButton.small(
+                  heroTag: "zoom_in",
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  onPressed: _zoomIn,
+                  child: const Icon(Icons.add),
+                ),
+                const SizedBox(height: 10),
+                FloatingActionButton.small(
+                  heroTag: "zoom_out",
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  onPressed: _zoomOut,
+                  child: const Icon(Icons.remove),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            right: 20,
+            child: FloatingActionButton(
+              heroTag: "gps_btn",
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.my_location, color: Colors.blueAccent),
+              onPressed: () => _determinePosition(),
+            ),
+          ),
+
+          // LAYER 4: SALDO
+          Positioned(
+            bottom: 30,
+            left: 20,
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUserId)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                int balance = 0;
+                if (snapshot.hasData && snapshot.data!.exists) {
+                  var data = snapshot.data!.data() as Map<String, dynamic>?;
+                  balance = data?['balance'] ?? 0;
+                }
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 10,
+                          offset: Offset(0, 5)),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.account_balance_wallet,
+                          color: Colors.blueAccent),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Saldo Anda",
+                              style:
+                                  TextStyle(fontSize: 10, color: Colors.grey)),
+                          Text("Rp $balance",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black87)),
+                        ],
+                      ),
+                      const SizedBox(width: 10),
+                      InkWell(
+                        onTap: () => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) =>
+                              TopUpSheet(userId: currentUserId),
+                        ),
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                              color: Colors.blue[50], shape: BoxShape.circle),
+                          child: const Icon(Icons.add,
+                              size: 18, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // LAYER 5: INFO CUACA (BARU!)
+          Positioned(
+            top: 115, // Tepat di bawah Search Bar
+            left: 20,
+            right: 20,
+            child: _buildWeatherCard(),
+          ),
+
+          // LAYER 6: SEARCH BAR (Paling Atas)
           Positioned(
             top: 50,
             left: 20,
             right: 20,
             child: Column(
               children: [
-                // KOTAK PENCARIAN
                 Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                      borderRadius: BorderRadius.circular(15)),
                   child: TextField(
                     controller: _searchController,
                     onTap: () => setState(() => _isSearching = true),
@@ -229,8 +379,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
-
-                // HASIL PENCARIAN (Muncul jika sedang mencari)
                 if (_isSearching && _filteredStations.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 10),
@@ -239,41 +387,29 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(15),
                       boxShadow: [
-                        BoxShadow(color: Colors.black12, blurRadius: 10),
+                        BoxShadow(color: Colors.black12, blurRadius: 10)
                       ],
                     ),
-                    constraints: const BoxConstraints(
-                      maxHeight: 200,
-                    ), // Batas tinggi list
+                    constraints: const BoxConstraints(maxHeight: 200),
                     child: ListView.builder(
                       shrinkWrap: true,
                       itemCount: _filteredStations.length,
                       itemBuilder: (context, index) {
                         final station = _filteredStations[index];
                         return ListTile(
-                          leading: const Icon(
-                            Icons.location_on,
-                            color: Colors.blue,
-                          ),
-                          title: Text(
-                            station.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            station.address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          leading:
+                              const Icon(Icons.location_on, color: Colors.blue),
+                          title: Text(station.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(station.address,
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
                           onTap: () {
-                            // 1. Pindahkan Peta ke lokasi stasiun
                             _mapController.move(
-                              LatLng(station.latitude, station.longitude),
-                              18,
-                            );
-                            // 2. Tutup Search
+                                LatLng(station.latitude, station.longitude),
+                                18);
                             setState(() => _isSearching = false);
                             FocusScope.of(context).unfocus();
-                            // 3. Buka Detail
                             _showStationDetail(context, station, currentUserId);
                           },
                         );
@@ -283,170 +419,99 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-
-          // ==============================================================
-          // LAYER 3: UI STATUS AKTIF SEWA (Jika ada)
-          // ==============================================================
-          Positioned(
-            top: 120,
-            left: 0,
-            right: 0,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('rentals')
-                  .where('userId', isEqualTo: currentUserId)
-                  .where('status', isEqualTo: 'active')
-                  .limit(1)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                  var rentalDoc = snapshot.data!.docs.first;
-                  return ActiveRentalCard(
-                    rentalData: rentalDoc.data() as Map<String, dynamic>,
-                    rentalId: rentalDoc.id,
-                  );
-                }
-                return const SizedBox();
-              },
-            ),
-          ),
-
-          // ==============================================================
-          // FITUR BARU: TOMBOL ZOOM (+ dan -)
-          // ==============================================================
-          Positioned(
-            bottom: 170, // Posisi di atas tombol GPS
-            right: 20,
-            child: Column(
-              children: [
-                // Tombol Zoom In (+)
-                FloatingActionButton.small(
-                  heroTag: "zoom_in", // Wajib beda tag agar tidak error
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black87,
-                  onPressed: _zoomIn,
-                  child: const Icon(Icons.add),
-                ),
-                const SizedBox(height: 10),
-                // Tombol Zoom Out (-)
-                FloatingActionButton.small(
-                  heroTag: "zoom_out", // Wajib beda tag
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black87,
-                  onPressed: _zoomOut,
-                  child: const Icon(Icons.remove),
-                ),
-              ],
-            ),
-          ),
-
-          // ==============================================================
-          // LAYER 4: TOMBOL GPS (KANAN TENGAH)
-          // ==============================================================
-          Positioned(
-            bottom: 100,
-            right: 20,
-            child: FloatingActionButton(
-              heroTag: "gps_btn",
-              backgroundColor: Colors.white,
-              child: const Icon(Icons.my_location, color: Colors.blueAccent),
-              onPressed: () => _determinePosition(), // Panggil fungsi GPS
-            ),
-          ),
-
-          // ==============================================================
-          // LAYER 5: SALDO & TOP UP
-          // ==============================================================
-          Positioned(
-            bottom: 30,
-            left: 20,
-            child: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(currentUserId)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                int balance = 0;
-                if (snapshot.hasData && snapshot.data!.exists) {
-                  var data = snapshot.data!.data() as Map<String, dynamic>?;
-                  balance = data?['balance'] ?? 0;
-                }
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.account_balance_wallet,
-                        color: Colors.blueAccent,
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Saldo Anda",
-                            style: TextStyle(fontSize: 10, color: Colors.grey),
-                          ),
-                          Text(
-                            "Rp $balance",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                      InkWell(
-                        onTap: () => showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) =>
-                              TopUpSheet(userId: currentUserId),
-                        ),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            size: 18,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
         ],
       ),
     );
   }
 
-  // --- HELPER ---
+  // --- WIDGET CUACA CANTIK ---
+  Widget _buildWeatherCard() {
+    // Tentukan warna dan ikon berdasarkan kondisi
+    Color bgGradientStart;
+    Color bgGradientEnd;
+    IconData weatherIcon;
+    String tips;
+
+    if (_weatherCondition.contains("Hujan")) {
+      bgGradientStart = Colors.blueGrey.shade700;
+      bgGradientEnd = Colors.blueGrey.shade900;
+      weatherIcon = Icons.thunderstorm;
+      tips = "Sedia payung sebelum hujan!";
+    } else if (_weatherCondition.contains("Berawan")) {
+      bgGradientStart = Colors.blue.shade300;
+      bgGradientEnd = Colors.blue.shade500;
+      weatherIcon = Icons.cloud;
+      tips = "Cuaca sejuk, tetap waspada.";
+    } else {
+      // Cerah
+      bgGradientStart = Colors.orange.shade400;
+      bgGradientEnd = Colors.orange.shade600;
+      weatherIcon = Icons.wb_sunny;
+      tips = "Panas terik, payung bisa buat peneduh.";
+    }
+
+    return GestureDetector(
+      onTap: _fetchWeatherSimulated, // Refresh saat diklik
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [bgGradientStart, bgGradientEnd],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: bgGradientEnd.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Ikon Cuaca
+            _isWeatherLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2),
+                  )
+                : Icon(weatherIcon, color: Colors.white, size: 32),
+            const SizedBox(width: 12),
+            
+            // Teks Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _isWeatherLoading ? "Memuat..." : "$_weatherCondition • $_temperature",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    _isWeatherLoading ? "Mengambil data satelit..." : tips,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- HELPER (Sama seperti sebelumnya) ---
   Widget _buildCustomMarker(StationModel station) {
     bool isAvailable = station.availableUmbrellas > 0;
     return Column(
@@ -484,10 +549,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showStationDetail(
-    BuildContext context,
-    StationModel station,
-    String userId,
-  ) {
+      BuildContext context, StationModel station, String userId) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -504,28 +566,21 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
-                child: Container(width: 40, height: 5, color: Colors.grey[300]),
-              ),
+                  child:
+                      Container(width: 40, height: 5, color: Colors.grey[300])),
               const SizedBox(height: 24),
-              Text(
-                station.name,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text(station.name,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 5),
               Row(
                 children: [
                   const Icon(Icons.location_on, size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: Text(
-                      station.address,
-                      style: TextStyle(color: Colors.grey[600]),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                      child: Text(station.address,
+                          style: TextStyle(color: Colors.grey[600]),
+                          overflow: TextOverflow.ellipsis)),
                 ],
               ),
               const Divider(height: 40),
@@ -535,31 +590,22 @@ class _HomePageState extends State<HomePage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Stok Payung",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      Text(
-                        "${station.availableUmbrellas} Unit",
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
+                      const Text("Stok Payung",
+                          style: TextStyle(color: Colors.grey)),
+                      Text("${station.availableUmbrellas} Unit",
+                          style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue)),
                     ],
                   ),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text("Tarif", style: TextStyle(color: Colors.grey)),
-                      Text(
-                        "Rp 5.000/jam",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text("Rp 5.000/jam",
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ],
@@ -579,14 +625,11 @@ class _HomePageState extends State<HomePage> {
                     backgroundColor: Colors.blueAccent,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                        borderRadius: BorderRadius.circular(16)),
                   ),
-                  child: Text(
-                    station.availableUmbrellas > 0
-                        ? "SEWA SEKARANG"
-                        : "STOK HABIS",
-                  ),
+                  child: Text(station.availableUmbrellas > 0
+                      ? "SEWA SEKARANG"
+                      : "STOK HABIS"),
                 ),
               ),
             ],
@@ -597,51 +640,36 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showRentalConfirmation(
-    BuildContext context,
-    StationModel station,
-    String userId,
-  ) {
+      BuildContext context, StationModel station, String userId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Konfirmasi Sewa"),
         content: Text(
-          "Sewa payung di ${station.name}?\n(Minimal saldo Rp 5.000)",
-        ),
+            "Sewa payung di ${station.name}?\n(Minimal saldo Rp 5.000)"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Batal"),
-          ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Batal")),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text("🔄 Memproses..."),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+                  duration: Duration(seconds: 1)));
               try {
                 await RentalService().startRental(
                   stationId: station.id,
                   stationName: station.name,
                   userId: userId,
                 );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                     content: Text("✅ Sewa Berhasil!"),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                    backgroundColor: Colors.green));
               } catch (e) {
                 String msg = e.toString().replaceAll("Exception: ", "");
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Gagal: $msg"),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text("Gagal: $msg"), backgroundColor: Colors.red));
               }
             },
             child: const Text("KONFIRMASI"),
